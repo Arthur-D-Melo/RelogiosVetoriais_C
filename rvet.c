@@ -8,6 +8,8 @@
  * Execução:   mpiexec -n 3 ./rvet
  */
 
+ //Arthur Felipe Dantas Melo
+
 #include <stdio.h>
 #include <string.h>
 #include <mpi.h>
@@ -52,6 +54,19 @@ void Send(int dest, Clock *clock) {
     int pid;
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
     // TODO: incrementar clock local e enviar clock->p via MPI_Send
+
+    //aq ele incrementa a parte do vetor q representa o relogio do proprio processo
+    clock->p[pid]++;
+
+    //faz o envio da mensagem
+    MPI_Send(
+        clock->p, //diz oq o processo vai enviar
+        3, //diz a quantidade de elementos
+        MPI_INT, //diz o tipo do valor q vai ser passado
+        dest, // diz pra quem vai enviar
+        0, //so uma tag
+        MPI_COMM_WORLD //diz que a comunicacao ta rolando no grupo onde estao os 3 processos
+    );
     
     // No final, imprime relógio atualizado:
     PrintClock("Envio de mensagem", clock);
@@ -67,8 +82,30 @@ void Send(int dest, Clock *clock) {
  */
 void Receive(int src, Clock *clock) {
     int pid;
+    int provisorio[3];
+
     MPI_Comm_rank(MPI_COMM_WORLD, &pid);
     // TODO: receber vetor e atualizar clock local
+    
+    MPI_Recv(
+        provisorio, //aq diz onde vamos guardar a informacao q vai chegar
+        3, //quantos valores vao ser recebidos
+        MPI_INT, //tipo dos valores
+        src, // de quem vai vir
+        0, // so uma tag dnv
+        MPI_COMM_WORLD, //diz q a comunicacao ta acontecendo no grupo que os 3 processos estao
+        MPI_STATUS_IGNORE // n precisa usar status
+        
+    );
+
+    //aq ele incrementa a parte do vetor que representa o proprio processo pq o ato de receber ja conta como evento
+    clock->p[pid]++;
+
+    for(int i = 0; i < 3; i++){
+        if(provisorio[i] > clock->p[i]){
+            clock->p[i] = provisorio[i];
+        }
+    }
     
     // No final, imprime relógio atualizado
     PrintClock("Recebimento de mensagem", clock);
@@ -83,20 +120,37 @@ void process0() {
     Clock clock = {{0,0,0}};
     PrintClock("Estado inicial", &clock);
 
-    Event(&clock);
     // TODO: Send/Receive conforme diagrama
+    
+    Event(&clock);
+    Send(1, &clock);
+    Receive(1, &clock);
+    Send(2, &clock);
+    Receive(2, &clock);
+    Send(1, &clock);
+    Event(&clock);
+    
 }
 
 void process1() {
     Clock clock = {{0,0,0}};
     PrintClock("Estado inicial", &clock);
     // TODO
+    
+    Send(0, &clock);
+    Receive(0, &clock);
+    Receive(0, &clock);
+    
 }
 
 void process2() {
     Clock clock = {{0,0,0}};
     PrintClock("Estado inicial", &clock);
     // TODO
+
+    Event(&clock);
+    Send(0, &clock);
+    Receive(0, &clock);
 }
 
 int main(void) {
